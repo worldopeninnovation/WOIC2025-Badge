@@ -17,7 +17,7 @@
     }
     h1 { margin: 0 0 10px; }
     canvas {
-      width: min(90vw, 800px);
+      width: min(90vw, 800px); /* preview size */
       height: auto;
       border: 2px solid var(--accent);
       border-radius: 16px;
@@ -40,7 +40,7 @@
     .btn:hover { background: #e0b800; }
     input[type="file"] { display: none; }
     .slider {
-      width: 200px; margin-left: 10px;
+      width: 200px;
     }
     .zoom-controls {
       margin-top: 12px;
@@ -71,7 +71,7 @@
   </div>
 
   <!-- Final Badge -->
-  <canvas id="canvas" width="800" height="800"></canvas>
+  <canvas id="canvas"></canvas>
 
   <script>
     const canvas = document.getElementById('canvas');
@@ -84,12 +84,17 @@
     const zoomOut = document.getElementById('zoomOut');
 
     const frame = new Image();
-    frame.src = 'woic-frame.png'; // keep in repo folder
+    frame.src = 'woic-frame.png'; // must be in repo folder
     let userImg = null;
     let scale = 1, offsetX = 0, offsetY = 0;
     let dragging = false, lastX = 0, lastY = 0;
 
-    frame.onload = () => draw();
+    frame.onload = () => {
+      // Match canvas resolution to frame's original size (e.g. 2500x2500)
+      canvas.width = frame.naturalWidth;
+      canvas.height = frame.naturalHeight;
+      draw();
+    };
 
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -123,18 +128,20 @@
     // Drag to move
     canvas.addEventListener('mousedown', e => {
       dragging = true;
-      lastX = e.offsetX;
-      lastY = e.offsetY;
+      lastX = e.offsetX * (canvas.width / canvas.clientWidth);
+      lastY = e.offsetY * (canvas.height / canvas.clientHeight);
       canvas.style.cursor = "grabbing";
     });
     canvas.addEventListener('mousemove', e => {
       if (!dragging) return;
-      const dx = e.offsetX - lastX;
-      const dy = e.offsetY - lastY;
+      const currX = e.offsetX * (canvas.width / canvas.clientWidth);
+      const currY = e.offsetY * (canvas.height / canvas.clientHeight);
+      const dx = currX - lastX;
+      const dy = currY - lastY;
       offsetX += dx;
       offsetY += dy;
-      lastX = e.offsetX;
-      lastY = e.offsetY;
+      lastX = currX;
+      lastY = currY;
       draw();
     });
     canvas.addEventListener('mouseup', () => { dragging = false; canvas.style.cursor = "grab"; });
@@ -175,4 +182,3 @@
   </script>
 </body>
 </html>
-
