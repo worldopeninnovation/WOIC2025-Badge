@@ -4,22 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>WOIC 2025 Badge Generator</title>
-
-  <!-- Cropper.js -->
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" rel="stylesheet" />
   <style>
     :root {
       --bg: #14284b;
       --accent: #ffce00;
-      --btn-font: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      --font: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
     }
     body {
-      margin: 0;
-      font-family: var(--btn-font);
-      background: var(--bg);
-      color: #fff;
-      text-align: center;
-      padding: 24px;
+      margin: 0; font-family: var(--font);
+      background: var(--bg); color: #fff;
+      text-align: center; padding: 24px;
     }
     h1 { margin: 0 0 10px; }
     canvas {
@@ -27,66 +21,31 @@
       height: auto;
       border: 2px solid var(--accent);
       border-radius: 16px;
-      background: #000;
       margin-top: 20px;
+      background: #000;
+      cursor: grab;
     }
     .controls {
       margin-top: 16px;
-      display: flex;
-      justify-content: center;
-      gap: 12px;
-      flex-wrap: wrap;
+      display: flex; justify-content: center;
+      gap: 12px; flex-wrap: wrap;
     }
     .btn {
-      background: var(--accent);
-      color: #111;
-      font-family: var(--btn-font);
-      font-weight: 700;
-      border: none;
-      border-radius: 8px;
-      padding: 12px 24px;
-      font-size: 16px;
-      cursor: pointer;
-      min-width: 160px;
-      text-align: center;
+      background: var(--accent); color: #111;
+      font-family: var(--font); font-weight: 700;
+      border: none; border-radius: 8px;
+      padding: 12px 24px; font-size: 16px;
+      cursor: pointer; min-width: 160px;
     }
     .btn:hover { background: #e0b800; }
     input[type="file"] { display: none; }
-
-    /* Crop modal */
-    .modal {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,.7);
-      display: none; align-items: center; justify-content: center;
-      z-index: 9999;
+    .slider {
+      width: 200px; margin-left: 10px;
     }
-    .modal.open { display: flex; }
-    .modal-card {
-      background: #0f1f39;
-      border-radius: 16px;
-      width: min(92vw, 860px);
-      height: min(90vh, 680px);
-      display: flex; flex-direction: column;
-      overflow: hidden;
-    }
-    .modal-body {
-      flex: 1; display: flex; align-items: center; justify-content: center;
-      position: relative; overflow: hidden;
-    }
-    #preview {
-      max-width: 100%; max-height: 100%;
-      display: block; background: #111;
-      user-select: none; touch-action: none;
-    }
-    #frame-overlay {
-      position: absolute; inset: 0;
-      max-width: 100%; max-height: 100%;
-      pointer-events: none;
-    }
-    .modal-footer {
-      padding: 12px;
-      display: flex; justify-content: center; gap: 12px;
-      background: rgba(0,0,0,.25);
+    .zoom-controls {
+      margin-top: 12px;
+      display: flex; justify-content: center; align-items: center;
+      gap: 8px;
     }
   </style>
 </head>
@@ -104,106 +63,98 @@
     <button id="reset" class="btn">Reset</button>
   </div>
 
+  <!-- Zoom slider -->
+  <div class="zoom-controls">
+    <button id="zoomOut" class="btn">–</button>
+    <input id="zoomSlider" type="range" min="0.1" max="3" step="0.01" value="1" class="slider">
+    <button id="zoomIn" class="btn">+</button>
+  </div>
+
   <!-- Final Badge -->
   <canvas id="canvas" width="800" height="800"></canvas>
 
-  <!-- Cropping Modal -->
-  <div id="modal" class="modal">
-    <div class="modal-card">
-      <div class="modal-body">
-        <img id="preview" alt="Crop preview" />
-        <img id="frame-overlay" alt="" />
-      </div>
-      <div class="modal-footer">
-        <button id="cancel" class="btn">Cancel</button>
-        <button id="confirm" class="btn">Confirm Crop</button>
-      </div>
-    </div>
-  </div>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
   <script>
-    const fileInput = document.getElementById('file');
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
-
-    const modal = document.getElementById('modal');
-    const previewImg = document.getElementById('preview');
-    const frameOverlay = document.getElementById('frame-overlay');
+    const fileInput = document.getElementById('file');
     const btnDownload = document.getElementById('download');
     const btnReset = document.getElementById('reset');
-    const btnConfirm = document.getElementById('confirm');
-    const btnCancel = document.getElementById('cancel');
+    const zoomSlider = document.getElementById('zoomSlider');
+    const zoomIn = document.getElementById('zoomIn');
+    const zoomOut = document.getElementById('zoomOut');
 
     const frame = new Image();
-    frame.src = 'woic-frame.png'; // must be in repo folder
-    let cropper = null;
+    frame.src = 'woic-frame.png'; // keep in repo folder
+    let userImg = null;
+    let scale = 1, offsetX = 0, offsetY = 0;
+    let dragging = false, lastX = 0, lastY = 0;
 
-    frame.onload = () => {
-      canvas.width = frame.naturalWidth;
-      canvas.height = frame.naturalHeight;
-      drawFrameOnly();
-      frameOverlay.src = frame.src;
-    };
+    frame.onload = () => draw();
 
-    function drawFrameOnly() {
+    function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (userImg) {
+        const imgW = userImg.width * scale;
+        const imgH = userImg.height * scale;
+        const x = canvas.width/2 - imgW/2 + offsetX;
+        const y = canvas.height/2 - imgH/2 + offsetY;
+        ctx.drawImage(userImg, x, y, imgW, imgH);
+      }
       ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
     }
 
-    // File upload
+    // Upload
     fileInput.addEventListener('change', e => {
       const file = e.target.files && e.target.files[0];
       if (!file) return;
       const reader = new FileReader();
       reader.onload = ev => {
-        previewImg.src = ev.target.result;
-        modal.classList.add('open');
-        document.body.style.overflow = 'hidden';
+        userImg = new Image();
+        userImg.onload = () => {
+          scale = 1; offsetX = 0; offsetY = 0;
+          zoomSlider.value = 1;
+          draw();
+        };
+        userImg.src = ev.target.result;
       };
       reader.readAsDataURL(file);
     });
 
-    previewImg.addEventListener('load', () => {
-      if (cropper) { cropper.destroy(); cropper = null; }
-      cropper = new Cropper(previewImg, {
-        aspectRatio: 1,
-        viewMode: 1,
-        guides: false,
-        center: false,
-        background: false,
-        highlight: false,
-        autoCrop: true,
-        autoCropArea: 1,
-        dragMode: 'move',
-        cropBoxMovable: false,
-        cropBoxResizable: false,
-        toggleDragModeOnDblclick: false,
-        zoomOnWheel: true
-      });
+    // Drag to move
+    canvas.addEventListener('mousedown', e => {
+      dragging = true;
+      lastX = e.offsetX;
+      lastY = e.offsetY;
+      canvas.style.cursor = "grabbing";
     });
-
-    // Confirm crop
-    btnConfirm.addEventListener('click', () => {
-      if (!cropper) return;
-      const cropped = cropper.getCroppedCanvas({
-        width: canvas.width,
-        height: canvas.height
-      });
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(cropped, 0, 0, canvas.width, canvas.height);
-      ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
-      closeModal();
+    canvas.addEventListener('mousemove', e => {
+      if (!dragging) return;
+      const dx = e.offsetX - lastX;
+      const dy = e.offsetY - lastY;
+      offsetX += dx;
+      offsetY += dy;
+      lastX = e.offsetX;
+      lastY = e.offsetY;
+      draw();
     });
+    canvas.addEventListener('mouseup', () => { dragging = false; canvas.style.cursor = "grab"; });
+    canvas.addEventListener('mouseleave', () => { dragging = false; canvas.style.cursor = "grab"; });
 
-    btnCancel.addEventListener('click', closeModal);
-
-    function closeModal() {
-      if (cropper) { cropper.destroy(); cropper = null; }
-      modal.classList.remove('open');
-      document.body.style.overflow = '';
-      previewImg.src = '';
-    }
+    // Zoom slider
+    zoomSlider.addEventListener('input', () => {
+      scale = parseFloat(zoomSlider.value);
+      draw();
+    });
+    zoomIn.addEventListener('click', () => {
+      scale = Math.min(3, scale + 0.1);
+      zoomSlider.value = scale;
+      draw();
+    });
+    zoomOut.addEventListener('click', () => {
+      scale = Math.max(0.1, scale - 0.1);
+      zoomSlider.value = scale;
+      draw();
+    });
 
     // Download
     btnDownload.addEventListener('click', () => {
@@ -216,10 +167,11 @@
     // Reset
     btnReset.addEventListener('click', () => {
       fileInput.value = '';
-      drawFrameOnly();
+      userImg = null;
+      scale = 1; offsetX = 0; offsetY = 0;
+      zoomSlider.value = 1;
+      draw();
     });
   </script>
 </body>
 </html>
-
-
