@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>WOIC 2025 Badge Generator</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -11,15 +12,18 @@
       color: white;
       padding: 20px;
     }
-    h1 {
-      margin-bottom: 10px;
-    }
+    h1 { margin-bottom: 10px; }
     #canvas {
       margin-top: 20px;
       border: 2px solid #ffce00;
       border-radius: 20px;
       max-width: 100%;
     }
+    #preview-container {
+      margin-top: 20px;
+      display: none;
+    }
+    img { max-width: 100%; }
     button, input[type="file"] {
       margin-top: 15px;
       padding: 10px 20px;
@@ -29,40 +33,69 @@
       font-weight: bold;
       cursor: pointer;
     }
-    button:hover {
-      background: #e0b800;
-    }
+    button:hover { background: #e0b800; }
   </style>
 </head>
 <body>
   <h1>Create Your WOIC 2025 Badge</h1>
-  <p>Upload your picture below to generate your personalized "I’m Attending" badge.</p>
+  <p>Upload and crop your photo to generate your personalized badge.</p>
 
   <input type="file" id="upload" accept="image/*"><br>
+
+  <!-- Crop Preview -->
+  <div id="preview-container">
+    <h3>Crop Your Photo</h3>
+    <img id="preview" alt="preview">
+    <br>
+    <button id="crop">Confirm Crop</button>
+  </div>
+
+  <!-- Final Badge -->
   <canvas id="canvas" width="800" height="800"></canvas><br>
   <button id="download">Download Badge</button>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
   <script>
     const upload = document.getElementById("upload");
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
     const frame = new Image();
-    frame.src = "woic-frame.png"; // make sure woic-frame.png is in same folder
+    frame.src = "woic-frame.png"; // must be in same repo folder
+    let cropper;
+
+    // Show frame by default
+    frame.onload = function() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+    }
 
     upload.addEventListener("change", function(e) {
       const reader = new FileReader();
       reader.onload = function(event) {
-        const img = new Image();
-        img.onload = function() {
-          // Draw uploaded image (scaled to fit canvas)
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          // Draw WOIC frame on top
-          ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
-        }
-        img.src = event.target.result;
+        document.getElementById("preview").src = event.target.result;
+        document.getElementById("preview-container").style.display = "block";
+        if (cropper) cropper.destroy();
+        cropper = new Cropper(document.getElementById("preview"), {
+          aspectRatio: 1, // square crop to fit frame
+          viewMode: 1,
+          movable: true,
+          zoomable: true,
+          scalable: true,
+          rotatable: false
+        });
       }
       reader.readAsDataURL(e.target.files[0]);
+    });
+
+    document.getElementById("crop").addEventListener("click", function() {
+      const croppedCanvas = cropper.getCroppedCanvas({
+        width: 800,
+        height: 800
+      });
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(croppedCanvas, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+      document.getElementById("preview-container").style.display = "none";
     });
 
     document.getElementById("download").addEventListener("click", function() {
@@ -74,3 +107,4 @@
   </script>
 </body>
 </html>
+
