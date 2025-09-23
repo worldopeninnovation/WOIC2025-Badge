@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WOIC 2025 Badge Generator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #14284b;
+      color: white;
+      padding: 20px;
+    }
+    h1 {
+      margin-bottom: 10px;
+    }
+    #canvas {
+      margin-top: 20px;
+      border: 2px solid #ffce00;
+      border-radius: 20px;
+      max-width: 100%;
+    }
+    button, input[type="file"] {
+      margin-top: 15px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      background: #ffce00;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #e0b800;
+    }
+  </style>
+</head>
+<body>
+  <h1>Create Your WOIC 2025 Badge</h1>
+  <p>Upload your picture below to generate your personalized "I’m Attending" badge.</p>
+
+  <input type="file" id="upload" accept="image/*"><br>
+  <canvas id="canvas" width="800" height="800"></canvas><br>
+  <button id="download">Download Badge</button>
+
+  <script>
+    const upload = document.getElementById("upload");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const frame = new Image();
+    frame.src = "woic-frame.png"; // make sure woic-frame.png is in same folder
+
+    upload.addEventListener("change", function(e) {
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const img = new Image();
+        img.onload = function() {
+          // Draw uploaded image (scaled to fit canvas)
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          // Draw WOIC frame on top
+          ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+        }
+        img.src = event.target.result;
+      }
+      reader.readAsDataURL(e.target.files[0]);
+    });
+
+    document.getElementById("download").addEventListener("click", function() {
+      const link = document.createElement("a");
+      link.download = "WOIC2025_Badge.png";
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    });
+  </script>
+</body>
+</html>
